@@ -94,3 +94,40 @@ tr.me td { color: var(--gold); font-weight: 700; }
 .banner { position: fixed; left: 0; right: 0; bottom: 0; background: #7a1f1f; color: #fff; text-align: center; padding: 10px; font-weight: 700; }
 .podium td:first-child { font-weight: 800; color: var(--gold); width: 2.5em; }
 @media (prefers-reduced-motion: reduce) { .in { transition: none; } }
+
+/* ---------- host game screen: fits the window, no scrolling ---------- */
+.hostgame { height: 100vh; height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 380px); gap: 14px; padding: 14px; }
+.hmain { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; padding: 14px 18px; border-width: 8px; }
+.hhead { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 18px; align-items: center; }
+.hinfo { display: flex; flex-direction: column; gap: 6px; }
+.hinfo .vsline { text-align: left; margin: 0; }
+.hphase { margin: 0; font-size: clamp(16px, 1.5vw, 22px); font-weight: 800; color: var(--soft); }
+.htimer .timer { font-size: clamp(44px, 6vh, 76px); min-width: 2ch; }
+.hcomm { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hcomm .card { --ch: clamp(80px, 13vh, 130px); --cw: calc(var(--ch) / 1.4); width: var(--cw); height: var(--ch); max-width: none; aspect-ratio: auto; }
+.cardarea { min-height: 0; display: flex; align-items: center; justify-content: center; }
+.grid.fit { grid-template-columns: repeat(4, var(--cw, 90px)); max-width: none; width: auto; margin: 0; }
+.grid.fit .slot { gap: 2px; }
+.grid.fit .tag { height: 22px; font-size: 20px; line-height: 22px; }
+.grid.fit .card { width: var(--cw, 90px); height: var(--ch, 126px); max-width: none; aspect-ratio: auto; }
+.fit .face .rk, .hcomm .face .rk { font-size: calc(var(--ch) * .36); }
+.fit .face .st, .hcomm .face .st { font-size: calc(var(--ch) * .3); }
+.fit .back b, .hcomm .back b { font-size: calc(var(--ch) * .34); }
+.hside { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.hside .panel { padding: 14px; }
+.hside table { font-size: 15px; }
+.hside td { padding: 6px 4px; }
+.nextup { text-align: center; }
+.vsline.big { font-size: clamp(32px, 5vw, 64px); }
+@media (max-width: 900px) { .hostgame { height: auto; grid-template-columns: minmax(0, 1fr); } .cardarea { height: 70vh; } .hhead { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- phone: input only ---------- */
+.phone { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; }
+.phone .phase { font-size: 28px; }
+.msg { text-align: center; color: var(--soft); font-size: 18px; margin: 0; }
+.keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.key { min-height: 56px; border-radius: 12px; border: 0; background: #8c1f2b; color: var(--card); font: 800 26px/1 'Archivo Narrow', Arial, sans-serif; cursor: pointer; }
+.key.sel { background: var(--gold); color: #1d1606; }
+.key:disabled { opacity: .45; cursor: default; }
+.phone .btn.big { flex: none; width: 100%; }
+.phone .result .hands { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }

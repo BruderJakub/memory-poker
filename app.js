@@ -120,6 +120,18 @@
     return '<div class="result"><div class="win">' + win + '</div><div class="hands">' + hand("a", A, v.picks.a, r.da, r.validA) + hand("b", B, v.picks.b, r.db, r.validB) + "</div></div>";
   }
 
+  // size the 4×4 grid on the host screen so it fills its area without scrolling
+  function fitCards() {
+    const area = document.getElementById("cardarea"), g = document.getElementById("fitgrid");
+    if (!area || !g) return;
+    const W = area.clientWidth, H = area.clientHeight, gap = Math.max(8, Math.min(18, H / 50)), tag = 24;
+    const ch = Math.max(60, Math.min((H - 3 * gap - 4 * tag) / 4, ((W - 3 * gap) / 4) * 1.4));
+    g.style.setProperty("--ch", ch + "px");
+    g.style.setProperty("--cw", ch / 1.4 + "px");
+    g.style.gap = gap + "px";
+  }
+  addEventListener("resize", fitCards);
+
   // countdown elements: data-end = local timestamp
   setInterval(() => {
     document.querySelectorAll("[data-end]").forEach(el => {
@@ -156,12 +168,11 @@
       '<div><label for="memo">Merkzeit</label><select id="memo">' + opt([10, 15, 20, 30, 45, 60, 90], s.memo, sec) + "</select></div>" +
       '<div><label for="sel">Auswahlzeit</label><select id="sel">' + opt([20, 30, 45, 60, 90, 120], s.sel, sec) + "</select></div>" +
       '<div><label for="games">Spiele pro Person</label><select id="games">' + opt([2, 4, 6, 8], s.games, x => x + " Spiele") + "</select></div>" +
-      '<div><label for="showHost">Karten in der Merkphase auf dem Host zeigen</label><select id="showHost"><option value="0">Nein (Zuschauer sehen nichts)</option><option value="1"' + (s.showHost ? " selected" : "") + ">Ja</option></select></div>" +
-      '</div><p class="small">Gerade Anzahl Spiele, damit es bei jeder Spielerzahl aufgeht. Niemand spielt zweimal gegen dieselbe Person.</p>' +
+      '</div><p class="small">Gerade Anzahl Spiele, damit es bei jeder Spielerzahl aufgeht. Niemand spielt zweimal gegen dieselbe Person. Die Karten erscheinen nur auf diesem Bildschirm, die Handys sind nur zum Eingeben.</p>' +
       '<div class="row"><button class="btn main big" id="create">Raum erstellen</button><button class="btn" id="back">Zurück</button></div></div></div>';
     document.getElementById("back").onclick = () => home();
     document.getElementById("create").onclick = () => {
-      const settings = { memo: +memoSel().value, sel: +document.getElementById("sel").value, games: +document.getElementById("games").value, showHost: document.getElementById("showHost").value === "1" };
+      const settings = { memo: +memoSel().value, sel: +document.getElementById("sel").value, games: +document.getElementById("games").value };
       store.set("mpk-settings", settings);
       new Host(settings, null);
     };
@@ -303,14 +314,15 @@
         a: cur[0], b: cur[1], endsIn: this.deadline ? this.deadline - Date.now() : 0, settings: this.s, games: this.effGames(),
         players: this.players.map(p => ({ name: p.name, score: p.score, w: p.w, d: p.d, l: p.l, played: p.played, ready: p.ready, online: p.online }))
       };
-      if (this.phase === "memo" && (playing || (role === "host" && this.s.showHost))) v.cards = this.deck.slice(0, 16);
-      if (this.phase === "select" || this.phase === "reveal") v.comm = this.deck.slice(16, 19);
+      // cards only ever go to the host screen; phones get the input and the result
+      if (role === "host" && this.phase === "memo") v.cards = this.deck.slice(0, 16);
+      if (role === "host" && (this.phase === "select" || this.phase === "reveal")) v.comm = this.deck.slice(16, 19);
       if (this.phase === "select") {
         v.locks = { a: this.picks.a.lock, b: this.picks.b.lock };
         if (playing) v.mine = this.picks[role === "A" ? "a" : "b"];
       }
       if (this.phase === "reveal") {
-        v.cards = this.deck.slice(0, 16);
+        if (role === "host") v.cards = this.deck.slice(0, 16);
         const L = pk => (this.valid(pk) ? [pk.l1, pk.l2] : []);
         v.picks = { a: { letters: L(this.picks.a) }, b: { letters: L(this.picks.b) } };
         v.result = this.result;
@@ -359,13 +371,23 @@
         reveal: '<button class="btn main" id="nx">' + (this.mi + 1 < this.matches.length ? "Nächstes Spiel" : "Zur Rangliste") + "</button>"
       }[this.phase];
       const up = this.matches.map((m, i) => '<li class="' + (i === this.mi ? "cur" : i < this.mi ? "done" : "") + '">' + (i + 1) + ". " + name(m[0]) + " – " + name(m[1]) + "</li>").join("");
-      app.innerHTML = '<div class="wrap"><div class="game"><div class="felt">' +
-        '<p class="phase">Spiel ' + v.no + " von " + v.total + " · " + titles[this.phase] + "</p>" +
+      // highlight picked cards on reveal
+      const hl = {};
+      if (v.picks) { v.picks.a.letters.forEach(l => (hl[l] = (hl[l] || "") + " pa")); v.picks.b.letters.forEach(l => (hl[l] = (hl[l] || "") + " pb")); }
+      const grid = this.phase === "intro"
+        ? '<div class="nextup"><p class="muted">Als Nächstes</p><p class="vsline big"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p>" + timerHTML(v) + "</div>"
+        : '<div class="grid fit" id="fitgrid">' + LET.map((l, i) => '<div class="slot"><span class="tag">' + l + "</span>" + cardHTML(v.cards ? v.cards[i] : null, { down: !v.cards, label: l, cls: hl[l] || "" }) + "</div>").join("") + "</div>";
+      const comm = (v.comm || [null, null, null]).map(c => cardHTML(c, { down: !c, label: "?" })).join("");
+      const sideTop = this.phase === "reveal" ? '<div class="panel">' + resultHTML(v) + "</div>" : this.phase === "select" ? '<div class="panel">' + center + "</div>" : "";
+      app.innerHTML = '<div class="hostgame"><section class="felt hmain">' +
+        '<header class="hhead"><div class="hinfo"><p class="hphase">Spiel ' + v.no + " von " + v.total + " · " + titles[this.phase] + "</p>" +
         '<p class="vsline"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p>" +
-        timerHTML(v) + (this.phase === "intro" ? "" : tableHTML(v)) + center +
-        '<div class="row" style="justify-content:center">' + btns + "</div></div>" +
-        '<aside class="stack"><div class="panel"><h2>Punkte</h2>' + boardHTML(v.players, -1) + '</div><div class="panel"><h2>Spielplan</h2><ul class="upcoming">' + up + "</ul></div>" +
-        '<p class="small">Raumcode ' + this.code + "</p></aside></div></div>";
+        '<div class="row">' + btns + "</div></div>" +
+        (this.phase === "intro" ? "" : '<div class="htimer">' + timerHTML(v) + "</div>") +
+        '<div class="hcomm"><span class="small">Gemeinschaftskarten</span><div class="row">' + comm + "</div></div></header>" +
+        '<div class="cardarea" id="cardarea">' + grid + "</div></section>" +
+        '<aside class="hside">' + sideTop + '<div class="panel"><h2>Punkte</h2>' + boardHTML(v.players, -1) + '</div><div class="panel"><h2>Spielplan</h2><ul class="upcoming">' + up + '</ul></div><p class="small">Raumcode ' + this.code + "</p></aside></div>";
+      fitCards();
       const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
       on("skip", () => ({ intro: () => this.memo(), memo: () => this.select(), select: () => this.reveal() }[this.phase]()));
       on("post", () => this.postpone());
@@ -449,16 +471,17 @@
       if (v.phase === "select" && playing && !fresh) return this.updateSelect();
       if (v.phase === "select" && playing && fresh) { this.sel = [v.mine.l1 || "", v.mine.l2 || ""]; }
       const vs = '<p class="vsline"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p>";
+      const myPts = '<p class="small" style="text-align:center">Deine Punkte: ' + fmt(my.score) + " · Spiele: " + my.played + " / " + v.games + "</p>";
       let body = "";
-      if (v.phase === "intro") body = '<p class="phase">' + (playing ? "Du bist dran!" : "Nächstes Spiel") + "</p>" + vs + timerHTML(v) + '<p class="small" style="text-align:center">' + (playing ? "Gleich erscheinen die 16 Karten. Gut merken!" : "Du schaust zu.") + "</p>";
-      if (v.phase === "memo") body = '<p class="phase">' + (playing ? "Karten merken!" : "Die beiden merken sich die Karten") + "</p>" + vs + timerHTML(v) + (playing ? tableHTML(v) : "");
-      if (v.phase === "select" && !playing) body = '<p class="phase">Auswahl läuft</p>' + vs + timerHTML(v) + '<p class="small" style="text-align:center">' + name(v.a) + ": " + (v.locks.a ? "bereit" : "wählt …") + " · " + name(v.b) + ": " + (v.locks.b ? "bereit" : "wählt …") + "</p>";
-      if (v.phase === "select" && playing) body = '<p class="phase">Wähle 2 Karten</p>' + vs + timerHTML(v) + tableHTML(v, { clickable: !v.mine.lock, selected: this.sel }) +
-        '<div class="picks"><div><label for="p1">1. Karte</label><input class="pick" id="p1" maxlength="1" autocomplete="off" value="' + esc(this.sel[0]) + '"></div><div><label for="p2">2. Karte</label><input class="pick" id="p2" maxlength="1" autocomplete="off" value="' + esc(this.sel[1]) + '"></div>' +
-        '<button class="btn main big" id="lock" style="flex:0 1 200px">Bereit</button></div><p class="err" id="perr" style="text-align:center"></p><p class="small" id="pstate" style="text-align:center"></p>';
-      if (v.phase === "reveal") body = '<p class="phase">Auflösung</p>' + vs + tableHTML(v) + resultHTML(v);
-      const side = '<div class="panel"><h2>Punkte</h2>' + boardHTML(P_, me) + "</div>";
-      app.innerHTML = '<div class="wrap"><div class="game"><div class="felt">' + body + "</div><aside>" + side + "</aside></div></div>";
+      if (v.phase === "intro") body = '<p class="phase">' + (playing ? "Du bist dran!" : "Nächstes Spiel") + "</p>" + vs + timerHTML(v) + '<p class="msg">' + (playing ? "Schau gleich auf den grossen Bildschirm und merk dir die 16 Karten." : "Du schaust zu.") + "</p>";
+      if (v.phase === "memo") body = '<p class="phase">' + (playing ? "Karten merken!" : "Merkphase") + "</p>" + vs + timerHTML(v) + '<p class="msg">' + (playing ? "Die Karten sind auf dem grossen Bildschirm." : "Die beiden merken sich die Karten.") + "</p>";
+      if (v.phase === "select" && !playing) body = '<p class="phase">Auswahl läuft</p>' + vs + timerHTML(v) + '<p class="msg">' + name(v.a) + ": " + (v.locks.a ? "bereit" : "wählt …") + "<br>" + name(v.b) + ": " + (v.locks.b ? "bereit" : "wählt …") + "</p>";
+      if (v.phase === "select" && playing) body = '<p class="phase">Wähle 2 Karten</p>' + timerHTML(v) +
+        '<div class="picks"><div><label for="p1">1. Karte</label><input class="pick" id="p1" maxlength="1" autocomplete="off" autocapitalize="characters" value="' + esc(this.sel[0]) + '"></div><div><label for="p2">2. Karte</label><input class="pick" id="p2" maxlength="1" autocomplete="off" autocapitalize="characters" value="' + esc(this.sel[1]) + '"></div></div>' +
+        '<div class="keys">' + LET.map(l => '<button type="button" class="key" data-l="' + l + '">' + l + "</button>").join("") + "</div>" +
+        '<button class="btn main big" id="lock">Bereit</button><p class="err" id="perr" style="text-align:center"></p><p class="small" id="pstate" style="text-align:center"></p>';
+      if (v.phase === "reveal") body = '<p class="phase">Auflösung</p>' + resultHTML(v) + '<p class="msg">Alle Karten siehst du auf dem grossen Bildschirm.</p>';
+      app.innerHTML = '<div class="phone">' + body + myPts + "</div>";
       if (v.phase === "select" && playing) this.bindSelect();
     }
     bindSelect() {
@@ -471,7 +494,7 @@
       };
       p1.addEventListener("input", () => { sync(); if (p1.value) p2.focus(); });
       p2.addEventListener("input", sync);
-      app.querySelectorAll("button.card[data-l]").forEach(b => b.addEventListener("click", () => {
+      app.querySelectorAll("button.key[data-l]").forEach(b => b.addEventListener("click", () => {
         if (this.v.mine.lock) return;
         const l = b.dataset.l;
         if (this.sel.includes(l)) this.sel = this.sel.map(x => (x === l ? "" : x));
@@ -503,7 +526,7 @@
       document.getElementById("perr").textContent = this.sel[0] || this.sel[1] ? err : "";
       const other = v.role === "A" ? v.locks.b : v.locks.a;
       document.getElementById("pstate").textContent = locked ? (other ? "Beide bereit!" : "Gespeichert. Warte auf die andere Person …") : "Was beim Ablauf der Zeit eingetragen ist, zählt auch ohne «Bereit»." + (other ? " Die andere Person ist schon bereit." : "");
-      app.querySelectorAll("button.card[data-l]").forEach(b => b.classList.toggle("sel", this.sel.includes(b.dataset.l)));
+      app.querySelectorAll("button.key[data-l]").forEach(b => { b.classList.toggle("sel", this.sel.includes(b.dataset.l)); b.disabled = locked; });
       const t = app.querySelector("[data-end]");
       if (t && v.endsIn > 0) t.dataset.end = Date.now() + v.endsIn;
     }
