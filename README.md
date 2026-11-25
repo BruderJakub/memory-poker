@@ -4,17 +4,17 @@ Ein Partyspiel für den Browser: 16 Karten merken, 2 davon wählen und mit 3 Gem
 
 ## So spielt man
 
-1. **Host** öffnet die Seite, wählt «Spiel hosten» und stellt den Raum ein: Merkzeit, Auswahlzeit, Spiele pro Person (gerade Zahl).
+1. **Host** öffnet die Seite auf dem grossen Bildschirm, wählt «Spiel hosten» und stellt den Raum ein: Merkzeit, Auswahlzeit, Spiele pro Person (gerade Zahl) und ob gleiche Gegner mehrmals vorkommen dürfen.
 2. **Spieler** öffnen die Seite auf dem Handy, wählen «Spiel beitreten», geben den 4-stelligen Raumcode und ihren Namen ein (oder scannen den QR-Code) und drücken «Bereit».
 3. Sobald alle bereit sind, drückt der Host **Start**.
 4. Pro Duell:
-   - Die zwei Spieler sehen die 16 Karten A–P für die Merkzeit.
+   - Die 16 Karten A–P erscheinen nur auf dem Host-Bildschirm (wie bei Kahoot). Die Handys sind nur zum Eingeben.
    - Danach sind die Karten verdeckt, 3 Gemeinschaftskarten werden gezeigt. Jeder wählt 2 Buchstaben (zwei Eingabefelder oder Karten antippen, jeder Buchstabe nur einmal).
    - Wer fertig ist, drückt «Bereit». Sind beide bereit, endet die Auswahl sofort. Läuft die Zeit ab, zählt, was eingetragen ist, auch ohne «Bereit».
    - Die Auflösung zeigt alle Karten und beide Hände. Sieg 1 Punkt, Unentschieden 0,5, Niederlage 0. Wer keine gültige Auswahl hat, verliert.
 5. Wenn alle ihre Spiele gespielt haben, erscheint die Rangliste.
 
-Niemand spielt zweimal gegen dieselbe Person, alle spielen gleich oft, und wenn möglich spielt niemand zweimal hintereinander.
+Alle spielen gleich oft, und wenn möglich spielt niemand zweimal hintereinander. Ohne Wiederholungen spielt niemand zweimal gegen dieselbe Person; mit Wiederholungen sind mehr Spiele als Gegner möglich.
 
 ## Technik
 

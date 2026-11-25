@@ -68,21 +68,36 @@
   }
 
   // Largest valid number of games per player: at most n-1, and n*k must be even.
-  function effectiveGames(n, k) {
-    let e = Math.min(k, n - 1);
+  function effectiveGames(n, k, repeat) {
+    if (n < 2) return 0;
+    let e = repeat ? k : Math.min(k, n - 1);
     if ((n * e) % 2) e--;
     return Math.max(e, 0);
   }
 
-  // Every player plays exactly k games, never the same opponent twice (circulant graph),
-  // ordered so nobody plays twice in a row when it can be avoided.
-  function makeSchedule(n, k) {
-    k = effectiveGames(n, k);
+  // one pass of a circulant graph: every player gets exactly k distinct opponents (k <= n-1, n*k even)
+  function circulant(n, k) {
     const order = shuffle([...Array(n).keys()]);
     const edges = [];
     for (let d = 1; d <= Math.floor(k / 2); d++)
       for (let i = 0; i < n; i++) edges.push([order[i], order[(i + d) % n]]);
     if (k % 2) for (let i = 0; i < n / 2; i++) edges.push([order[i], order[i + n / 2]]);
+    return edges;
+  }
+
+  // Every player plays exactly k games, never the same opponent twice (circulant graph),
+  // ordered so nobody plays twice in a row when it can be avoided.
+  // repeat = false: never the same opponent twice. repeat = true: more games than n-1 allowed,
+  // built from several passes, so opponents repeat as evenly as possible.
+  function makeSchedule(n, k, repeat) {
+    k = effectiveGames(n, k, repeat);
+    let edges = [], left = k;
+    while (left > 0) {
+      const pass = effectiveGames(n, left, false);
+      if (!pass) break;
+      edges = edges.concat(circulant(n, pass));
+      left -= pass;
+    }
     const last = Array(n).fill(-99);
     const out = [];
     const pool = shuffle(edges.slice());

@@ -110,8 +110,8 @@
   function boardHTML(players, me) {
     const rows = players.map((p, i) => ({ ...p, i })).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
     let rank = 0, prev = null;
-    return '<table class="podium"><tr><th>#</th><th>Name</th><th class="n">Punkte</th><th class="n">S / U / N</th><th class="n">Spiele</th></tr>' +
-      rows.map((p, k) => { if (p.score !== prev) { rank = k + 1; prev = p.score; } return '<tr class="' + (p.i === me ? "me" : "") + '"><td>' + rank + ".</td><td>" + esc(p.name) + '</td><td class="n">' + fmt(p.score) + '</td><td class="n">' + p.w + " / " + p.d + " / " + p.l + '</td><td class="n">' + p.played + "</td></tr>"; }).join("") + "</table>";
+    return '<table class="podium"><tr><th>#</th><th>Name</th><th class="n">Punkte</th><th class="n">Spiele</th></tr>' +
+      rows.map((p, k) => { if (p.score !== prev) { rank = k + 1; prev = p.score; } return '<tr class="' + (p.i === me ? "me" : "") + '"><td>' + rank + ".</td><td>" + esc(p.name) + '</td><td class="n">' + fmt(p.score) + '</td><td class="n">' + p.played + "</td></tr>"; }).join("") + "</table>";
   }
   function resultHTML(v) {
     const r = v.result, A = v.players[v.a], B = v.players[v.b];
@@ -168,11 +168,12 @@
       '<div><label for="memo">Merkzeit</label><select id="memo">' + opt([10, 15, 20, 30, 45, 60, 90], s.memo, sec) + "</select></div>" +
       '<div><label for="sel">Auswahlzeit</label><select id="sel">' + opt([20, 30, 45, 60, 90, 120], s.sel, sec) + "</select></div>" +
       '<div><label for="games">Spiele pro Person</label><select id="games">' + opt([2, 4, 6, 8], s.games, x => x + " Spiele") + "</select></div>" +
-      '</div><p class="small">Gerade Anzahl Spiele, damit es bei jeder Spielerzahl aufgeht. Niemand spielt zweimal gegen dieselbe Person. Die Karten erscheinen nur auf diesem Bildschirm, die Handys sind nur zum Eingeben.</p>' +
+      '<div><label for="rep">Gleiche Gegner mehrmals?</label><select id="rep"><option value="0">Nein, jedes Duell nur einmal</option><option value="1"' + (s.repeat ? " selected" : "") + ">Ja, Wiederholungen erlaubt</option></select></div>" +
+      '</div><p class="small">Gerade Anzahl Spiele, damit es bei jeder Spielerzahl aufgeht. Ohne Wiederholungen spielt niemand zweimal gegen dieselbe Person. Die Karten erscheinen nur auf diesem Bildschirm, die Handys sind nur zum Eingeben.</p>' +
       '<div class="row"><button class="btn main big" id="create">Raum erstellen</button><button class="btn" id="back">Zurück</button></div></div></div>';
     document.getElementById("back").onclick = () => home();
     document.getElementById("create").onclick = () => {
-      const settings = { memo: +memoSel().value, sel: +document.getElementById("sel").value, games: +document.getElementById("games").value };
+      const settings = { memo: +memoSel().value, sel: +document.getElementById("sel").value, games: +document.getElementById("games").value, repeat: document.getElementById("rep").value === "1" };
       store.set("mpk-settings", settings);
       new Host(settings, null);
     };
@@ -249,10 +250,10 @@
       }
     }
     valid(pk) { return pk.l1 && pk.l2 && pk.l1 !== pk.l2; }
-    effGames() { return P.effectiveGames(this.players.length, this.s.games); }
+    effGames() { return P.effectiveGames(this.players.length, this.s.games, this.s.repeat); }
     start() {
       if (this.players.length < 2) return;
-      this.matches = P.makeSchedule(this.players.length, this.s.games);
+      this.matches = P.makeSchedule(this.players.length, this.s.games, this.s.repeat);
       this.mi = -1;
       this.next();
     }
@@ -342,7 +343,7 @@
       const name = i => esc(this.players[i]?.name || "?");
       if (this.phase === "lobby") {
         const url = location.origin + location.pathname + "?room=" + this.code + (LOCAL ? "&local" : "");
-        const n = this.players.length, g = P.effectiveGames(n, this.s.games);
+        const n = this.players.length, g = P.effectiveGames(n, this.s.games, this.s.repeat);
         const allReady = n >= 2 && this.players.every(p => p.ready);
         app.innerHTML = '<div class="wrap stack"><div class="hero"><div><p class="muted">Raumcode</p><div class="code">' + this.code + '</div><p class="small">Beitreten auf dieser Seite mit «Spiel beitreten» oder direkt über den Link:</p><p class="small" style="overflow-wrap:anywhere">' + esc(url) + "</p></div>" +
           '<div class="qr" id="qr" aria-label="QR-Code zum Beitreten"></div></div>' +
@@ -370,23 +371,24 @@
         select: '<button class="btn main" id="skip">Auswahl beenden</button>',
         reveal: '<button class="btn main" id="nx">' + (this.mi + 1 < this.matches.length ? "Nächstes Spiel" : "Zur Rangliste") + "</button>"
       }[this.phase];
-      const up = this.matches.map((m, i) => '<li class="' + (i === this.mi ? "cur" : i < this.mi ? "done" : "") + '">' + (i + 1) + ". " + name(m[0]) + " – " + name(m[1]) + "</li>").join("");
       // highlight picked cards on reveal
       const hl = {};
       if (v.picks) { v.picks.a.letters.forEach(l => (hl[l] = (hl[l] || "") + " pa")); v.picks.b.letters.forEach(l => (hl[l] = (hl[l] || "") + " pb")); }
       const grid = this.phase === "intro"
-        ? '<div class="nextup"><p class="muted">Als Nächstes</p><p class="vsline big"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p>" + timerHTML(v) + "</div>"
+        ? '<div class="nextup"><p class="muted">Als Nächstes</p><p class="vsline big"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p></div>"
         : '<div class="grid fit" id="fitgrid">' + LET.map((l, i) => '<div class="slot"><span class="tag">' + l + "</span>" + cardHTML(v.cards ? v.cards[i] : null, { down: !v.cards, label: l, cls: hl[l] || "" }) + "</div>").join("") + "</div>";
       const comm = (v.comm || [null, null, null]).map(c => cardHTML(c, { down: !c, label: "?" })).join("");
-      const sideTop = this.phase === "reveal" ? '<div class="panel">' + resultHTML(v) + "</div>" : this.phase === "select" ? '<div class="panel">' + center + "</div>" : "";
-      app.innerHTML = '<div class="hostgame"><section class="felt hmain">' +
-        '<header class="hhead"><div class="hinfo"><p class="hphase">Spiel ' + v.no + " von " + v.total + " · " + titles[this.phase] + "</p>" +
+      let status = "";
+      if (this.phase === "select") status = '<p class="hstatus"><span class="a">' + name(v.a) + "</span> " + (v.locks.a ? "✓ bereit" : "wählt …") + ' · <span class="b">' + name(v.b) + "</span> " + (v.locks.b ? "✓ bereit" : "wählt …") + "</p>";
+      if (this.phase === "reveal") status = resultHTML(v);
+      app.innerHTML = '<div class="hostgame">' +
+        '<header class="hbar"><p class="hphase">Spiel ' + v.no + " von " + v.total + " · " + titles[this.phase] + '</p>' +
         '<p class="vsline"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p>" +
-        '<div class="row">' + btns + "</div></div>" +
-        (this.phase === "intro" ? "" : '<div class="htimer">' + timerHTML(v) + "</div>") +
-        '<div class="hcomm"><span class="small">Gemeinschaftskarten</span><div class="row">' + comm + "</div></div></header>" +
-        '<div class="cardarea" id="cardarea">' + grid + "</div></section>" +
-        '<aside class="hside">' + sideTop + '<div class="panel"><h2>Punkte</h2>' + boardHTML(v.players, -1) + '</div><div class="panel"><h2>Spielplan</h2><ul class="upcoming">' + up + '</ul></div><p class="small">Raumcode ' + this.code + "</p></aside></div>";
+        '<div class="htimer">' + timerHTML(v) + "</div>" +
+        '<div class="row">' + btns + "</div></header>" +
+        '<aside class="hleft"><div class="hcomm"><span class="small">Gemeinschaftskarten</span>' + comm + "</div>" +
+        '<div class="panel hboard"><h2>Punkte</h2>' + boardHTML(v.players, -1) + '</div><p class="small">Raumcode ' + this.code + "</p></aside>" +
+        '<section class="felt hmain">' + (status ? '<div class="hres">' + status + "</div>" : "") + '<div class="cardarea" id="cardarea">' + grid + "</div></section></div>";
       fitCards();
       const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
       on("skip", () => ({ intro: () => this.memo(), memo: () => this.select(), select: () => this.reveal() }[this.phase]()));
