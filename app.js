@@ -153,7 +153,7 @@
   function home(msg) {
     const saved = store.get("mpk-host");
     app.innerHTML = '<div class="wrap stack"><h1>Memory Poker</h1>' +
-      '<p class="muted">16 Karten merken, 2 davon wählen, mit 3 Gemeinschaftskarten die beste Pokerhand bilden.</p>' +
+      '<p class="muted">16 Karten merken, 2 davon wählen, mit 3 Gemeinschaftskarten die beste Pokerhand bilden.</p><p class="small">Version 202611252335</p>' +
       (msg ? '<p class="err">' + esc(msg) + "</p>" : "") +
       '<div class="row"><button class="btn main big" id="goHost">Spiel hosten</button><button class="btn big" id="goJoin">Spiel beitreten</button></div>' +
       (saved && saved.phase !== "end" ? '<div class="panel row"><span>Laufendes Spiel in Raum <b>' + esc(saved.code) + '</b> gefunden.</span><button class="btn main" id="resume">Fortsetzen</button><button class="btn" id="drop">Verwerfen</button></div>' : "") +
