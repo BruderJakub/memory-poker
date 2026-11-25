@@ -124,11 +124,18 @@
   function fitCards() {
     const area = document.getElementById("cardarea"), g = document.getElementById("fitgrid");
     if (!area || !g) return;
-    const W = area.clientWidth, H = area.clientHeight, gap = Math.max(8, Math.min(18, H / 50)), tag = 24;
-    const ch = Math.max(60, Math.min((H - 3 * gap - 4 * tag) / 4, ((W - 3 * gap) / 4) * 1.4));
-    g.style.setProperty("--ch", ch + "px");
-    g.style.setProperty("--cw", ch / 1.4 + "px");
-    g.style.gap = gap + "px";
+    const rev = area.classList.contains("reveal");
+    const W = area.clientWidth, H = area.clientHeight, tag = 24;
+    const sw = rev ? Math.max(190, Math.min(320, W * 0.22)) : 0; // width of each hand panel
+    const sg = rev ? Math.max(20, W * 0.03) : 0;                // space between panels and grid
+    const rg = Math.max(10, Math.min(28, H * 0.03));               // row gap
+    const availW = W - 2 * sw - 2 * sg;
+    const ch = Math.max(60, Math.min((H - 3 * rg - 4 * tag) / 4, ((availW - 3 * 14) / 4) * 1.4));
+    const cw = ch / 1.4;
+    const spread = Math.max(14, Math.min(cw * 0.9, (W * 0.88 - 4 * cw) / 3)); // generous column gap while playing
+    const set = (k, val) => area.style.setProperty(k, val + "px");
+    set("--ch", ch); set("--cw", cw); set("--rg", rg); set("--cg", rev ? 14 : spread); set("--cgFrom", spread);
+    set("--sw", sw); set("--sg", sg); set("--mch", Math.min(ch * 0.95, 150));
   }
   addEventListener("resize", fitCards);
 
@@ -371,25 +378,37 @@
         select: '<button class="btn main" id="skip">Auswahl beenden</button>',
         reveal: '<button class="btn main" id="nx">' + (this.mi + 1 < this.matches.length ? "Nächstes Spiel" : "Zur Rangliste") + "</button>"
       }[this.phase];
-      // highlight picked cards on reveal
-      const hl = {};
-      if (v.picks) { v.picks.a.letters.forEach(l => (hl[l] = (hl[l] || "") + " pa")); v.picks.b.letters.forEach(l => (hl[l] = (hl[l] || "") + " pb")); }
+      const rev = this.phase === "reveal";
+      const picked = {};
+      if (v.picks) { v.picks.a.letters.forEach(l => (picked[l] = (picked[l] || "") + " pa")); v.picks.b.letters.forEach(l => (picked[l] = (picked[l] || "") + " pb")); }
+      const cls = l => rev ? (picked[l] ? picked[l] + " picked" : " dim") : "";
       const grid = this.phase === "intro"
         ? '<div class="nextup"><p class="muted">Als Nächstes</p><p class="vsline big"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p></div>"
-        : '<div class="grid fit" id="fitgrid">' + LET.map((l, i) => '<div class="slot"><span class="tag">' + l + "</span>" + cardHTML(v.cards ? v.cards[i] : null, { down: !v.cards, label: l, cls: hl[l] || "" }) + "</div>").join("") + "</div>";
+        : '<div class="grid fit" id="fitgrid">' + LET.map((l, i) => '<div class="slot"><span class="tag">' + l + "</span>" + cardHTML(v.cards ? v.cards[i] : null, { down: !v.cards, label: l, cls: cls(l) }) + "</div>").join("") + "</div>";
       const comm = (v.comm || [null, null, null]).map(c => cardHTML(c, { down: !c, label: "?" })).join("");
-      let status = "";
-      if (this.phase === "select") status = '<p class="hstatus"><span class="a">' + name(v.a) + "</span> " + (v.locks.a ? "✓ bereit" : "wählt …") + ' · <span class="b">' + name(v.b) + "</span> " + (v.locks.b ? "✓ bereit" : "wählt …") + "</p>";
-      if (this.phase === "reveal") status = resultHTML(v);
+      const handSide = side => {
+        const r = v.result, pi = side === "a" ? v.a : v.b, letters = v.picks[side].letters;
+        const valid = side === "a" ? r.validA : r.validB, desc = side === "a" ? r.da : r.db;
+        const won = r.winner === (side === "a" ? "A" : "B");
+        const badge = won ? '<span class="badge">Sieg · 1 Punkt</span>' : r.winner === "draw" ? '<span class="badge d">Unentschieden · 0,5</span>' : '<span class="badge l">0 Punkte</span>';
+        const minis = valid ? letters.map(l => '<div class="slot"><span class="tag">' + l + "</span>" + cardHTML(v.cards[LET.indexOf(l)], {}) + "</div>").join("") : '<p class="muted">keine gültige Auswahl</p>';
+        return '<div class="hand2 ' + side + (won ? " won" : "") + '"><div class="who">' + name(pi) + '</div><div class="mini">' + minis + '</div><div class="hdesc">' + esc(desc || "") + "</div>" + badge + "</div>";
+      };
+      let top = "";
+      if (this.phase === "select") top = '<p class="hstatus"><span class="a">' + name(v.a) + "</span> " + (v.locks.a ? "✓ bereit" : "wählt …") + ' · <span class="b">' + name(v.b) + "</span> " + (v.locks.b ? "✓ bereit" : "wählt …") + "</p>";
+      if (rev) {
+        const r = v.result;
+        top = '<p class="winline">' + (r.winner === "A" ? name(v.a) + " gewinnt!" : r.winner === "B" ? name(v.b) + " gewinnt!" : r.winner === "draw" ? "Unentschieden!" : "Keine gültige Auswahl") + "</p>";
+      }
       app.innerHTML = '<div class="hostgame">' +
         '<header class="hbar"><p class="hphase">Spiel ' + v.no + " von " + v.total + " · " + titles[this.phase] + '</p>' +
         '<p class="vsline"><span class="a">' + name(v.a) + '</span> gegen <span class="b">' + name(v.b) + "</span></p>" +
         '<div class="htimer">' + timerHTML(v) + "</div>" +
         '<div class="row">' + btns + "</div></header>" +
-        '<aside class="hleft"><div class="hcomm"><span class="small">Gemeinschaftskarten</span>' + comm + "</div>" +
-        '<div class="panel hboard"><h2>Punkte</h2>' + boardHTML(v.players, -1) + '</div><p class="small">Raumcode ' + this.code + "</p></aside>" +
-        '<section class="felt hmain">' + (status ? '<div class="hres">' + status + "</div>" : "") + '<div class="cardarea" id="cardarea">' + grid + "</div></section></div>";
-      fitCards();
+        '<aside class="hleft"><div class="hcomm"><span class="small">Gemeinschaftskarten</span>' + comm + '</div><p class="small">Raumcode ' + this.code + "</p></aside>" +
+        '<section class="felt hmain">' + (top ? '<div class="hres">' + top + "</div>" : "") +
+        '<div class="cardarea' + (rev ? " reveal" : "") + '" id="cardarea">' + (rev ? handSide("a") : "") + grid + (rev ? handSide("b") : "") + "</div></section></div>";
+      fitCards(); requestAnimationFrame(fitCards); if (document.fonts) document.fonts.ready.then(fitCards);
       const on = (id, f) => { const el = document.getElementById(id); if (el) el.onclick = f; };
       on("skip", () => ({ intro: () => this.memo(), memo: () => this.select(), select: () => this.reveal() }[this.phase]()));
       on("post", () => this.postpone());
